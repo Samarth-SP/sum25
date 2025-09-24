@@ -6,41 +6,51 @@ import random
 import mujoco
 import mujoco_viewer
 import math
+from quadruped import QuadEnv
 
-model = PPO.load("op3_ppo_bestalt")
-env = gym.make("op3alt")
+from gymnasium.envs.registration import register
+
+
+register(
+    id="QuadEnv-v0",
+    entry_point="quadruped:QuadEnv",
+)
+
+model = PPO.load("quad_ppo_5M")
+env = gym.make("QuadEnv-v0")
 mjmodel = env.unwrapped.model
 data = mujoco.MjData(mjmodel)
 
-# for i in range(mjmodel.ngeom):
-#     name_addr = mjmodel.name_geomadr[i]
-#     name = mjmodel.names[name_addr:].split(b'\x00', 1)[0].decode('utf-8')
-#     print(f"{i}: {name}")
+for i in range(mjmodel.ngeom):
+    name_addr = mjmodel.name_geomadr[i]
+    name = mjmodel.names[name_addr:].split(b'\x00', 1)[0].decode('utf-8')
+    print(f"{i}: {name}")
 
 # create the viewer object
 viewer = mujoco_viewer.MujocoViewer(mjmodel, data)
 # simulate and render
-for _ in range(10000):
+energy = 0
+d = []
+for _ in range(10000):  
     if viewer.is_alive:
         position = data.qpos.flatten()[1:]
         velocity = np.clip(data.qvel.flatten(), -10, 10)
         obs = np.concatenate((position, velocity)).ravel()        
-        action, _states = model.predict(obs)
+        if(not _ % 4):
+            action, _states = model.predict(obs) #every four steps
         data.ctrl[:] = action
-        qw, qx, qy, qz = data.qpos[4:8]
-        print(data.geom_xpos[50][1] - data.geom_xpos[37][1])
-        # print(qw-1, qx, qy-0.2, qz)
-        # print(data.contact.geom)
-        # print(np.sum(np.abs(data.qfrc_actuator)))
+        energy += np.sum(np.abs(data.qvel[6:]) * np.abs(data.actuator_force)) * 0.002
+        print(data.qpos)
         mujoco.mj_step(mjmodel, data)
-        viewer.render()
+        viewer.render() #every six steps
+        d.append(data.qpos[6:].copy())
     else:
         break
 
 # close
 viewer.close()  
-
-# test_env = gym.make("op3alt", render_mode="human")
+#np.savetxt('joint.csv', d, delimiter=", ")
+# test_env = gym.make("QuadEnv-v0", render_mode="human")
 # test_env.reset()
 # for i in range(2):
 #     obs, info = test_env.reset()
@@ -48,9 +58,13 @@ viewer.close()
 #     while not ep_end:
 #         action, _states = model.predict(obs)
 #         obs, reward, terminated, truncated, info = test_env.step(action)
-#         print(info)
+#         #print(info)
 #         test_env.render()
-#         if terminated or truncated:
+#         print(obs)
+#         if terminated:
 #             obs, info = test_env.reset()
 #         ep_end = terminated or truncated
+#         print(info)
 # test_env.close()
+
+# print(forrewsum, rewsum)

@@ -5,13 +5,17 @@ import numpy as np
 import random
 import mujoco
 import mujoco_viewer
+from stable_baselines3.common.env_util import make_vec_env
 
-train_env = gym.make("op3alt")
-train_env.reset()
-mjmodel = train_env.unwrapped.model
-model = PPO.load("op3_ppo_best", env=train_env)
+vec_env = make_vec_env("op3alt", n_envs=8)
+vec_env.reset()
+
+
+model = PPO.load("op3_ppo_v1test1", env=vec_env)
+model.ent_coef = 0
+model.learning_rate = 1e-5
 model.learn(total_timesteps=10000000)
-model.save(f"op3_ppo_bestalt2")
+model.save(f"op3_ppo_v1test3")
 
 
 # test_env = gym.make("op3", render_mode="human")
